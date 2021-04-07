@@ -1,0 +1,64 @@
+pipeline {
+	agent any
+
+	tools {
+		maven 'M3'
+	}
+
+	stages {
+		stage('Checkout') {
+			steps {
+				git url: ''
+			}
+		}
+
+		stage('Maven Build') {
+			steps {
+				sh label: '', script: 'mvn clean package'
+			}
+		}
+		stage('Post Build Actions') {
+			parallel {
+				stage('Archive Artifacts') {
+					steps {
+						archiveArtifacts artifacts: 'target/*.?ar', followSymlinks: false
+					}
+				}
+
+				stage('Test Results') {
+					steps {
+						junit 'target/surefire-reports/*.xml'
+					}
+				}
+				
+				stage('Nexus Uploader') {
+					steps {
+						nexusArtifactUploader artifacts: 
+					}
+				}
+			}
+		}
+	}
+
+	post {
+		success {
+			notify('Success')
+		}
+		failure {
+			notify('Failed')
+		}
+		aborted {
+			notify('Aborted')
+		}
+	}
+
+}
+
+def notify(status){
+    emailext (
+      to: "Mail-id",
+      subject: "${status}: Job '${env.JOB_NAME} [${env.BUILD_NUMBER}]'",
+      body: """<p>${status}: Job '${env.JOB_NAME} [${env.BUILD_NUMBER}]':</p>
+        <p>Check console output at <a href='${env.BUILD_URL}'>${env.JOB_NAME} [${env.BUILD_NUMBER}]</a></p>""",
+    )
+}
